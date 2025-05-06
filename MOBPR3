@@ -1,0 +1,120 @@
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ConverterScreen(
+    onNavigateToHistory: () -> Unit,
+    onNavigateToSettings: () -> Unit
+) {
+    var amount by remember { mutableStateOf("") }
+    var fromCurrency by remember { mutableStateOf("USD") }
+    var toCurrency by remember { mutableStateOf("EUR") }
+    var result by remember { mutableStateOf("") }
+    var isLoading by remember { mutableStateOf(false) }
+
+    val currencies = listOf("USD", "EUR", "GBP", "JPY", "RUB")
+
+    fun convertCurrency() {
+        if (amount.isNotEmpty()) {
+            isLoading = true
+            result = ""
+            
+            CoroutineScope(Dispatchers.IO).launch {
+                try {
+                    val client = OkHttpClient()
+                    
+                    val request = Request.Builder()
+                        .url("https://v6.exchangerate-api.com/v6/YOUR_API_KEY/pair/$fromCurrency/$toCurrency/${amount.toDouble()}")
+                        .build()
+
+                    val response = client.newCall(request).execute()
+                    val responseData = response.body?.string()
+
+                    if (response.isSuccessful && !responseData.isNullOrEmpty()) {
+                        val json = JSONObject(responseData)
+                        val conversionResult = json.getDouble("conversion_result")
+                        
+                        withContext(Dispatchers.Main) {
+                            result = "%.2f %s = %.2f %s".format(
+                                amount.toDouble(),
+                                fromCurrency,
+                                conversionResult,
+                                toCurrency
+                            )
+
+                            println("API Response: $responseData")
+                            println("Converted: $result")
+                        }
+                    }
+                } catch (e: Exception) {
+                    withContext(Dispatchers.Main) {
+                        result = "Ошибка: ${e.message}"
+                        println("API Error: ${e.message}")
+                    }
+                } finally {
+                    withContext(Dispatchers.Main) {
+                        isLoading = false
+                    }
+                }
+            }
+        }
+    }
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Конвертер валют") },
+                actions = {
+                    IconButton(onClick = onNavigateToHistory) {
+                        Icon(Icons.Default.History, "История")
+                    }
+                    IconButton(onClick = onNavigateToSettings) {
+                        Icon(Icons.Default.Settings, "Настройки")
+                    }
+                }
+            )
+        }
+    ) { padding ->
+        Column(
+            modifier = Modifier
+                .padding(padding)
+                .fillMaxSize()
+                .padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            OutlinedTextField(
+                value = amount,
+                onValueChange = { amount = it },
+                label = { Text("Сумма") },
+                keyboardOptions = KeyboardOptions.Default.copy(
+                    keyboardType = KeyboardType.Number
+                ),
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            Button(
+                onClick = { convertCurrency() },
+                modifier = Modifier.fillMaxWidth(),
+                enabled = !isLoading
+            ) {
+                if (isLoading) {
+                    CircularProgressIndicator(color = MaterialTheme.colorScheme.onPrimary)
+                } else {
+                    Text("Конвертировать")
+                }
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            if (result.isNotEmpty()) {
+                Text(
+                    text = result,
+                    style = MaterialTheme.typography.headlineSmall
+                )
+            }
+        }
+    }
+}
