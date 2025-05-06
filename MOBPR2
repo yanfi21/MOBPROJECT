@@ -1,0 +1,266 @@
+package com.example.currencyconverter
+
+import android.os.Bundle
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
+import androidx.compose.foundation.layout.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.unit.dp
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
+
+class MainActivity : ComponentActivity() {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setContent {
+            CurrencyConverterTheme {
+                Surface(
+                    modifier = Modifier.fillMaxSize(),
+                    color = MaterialTheme.colorScheme.background
+                ) {
+                    CurrencyNavGraph()
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun CurrencyNavGraph() {
+    val navController = rememberNavController()
+    
+    NavHost(
+        navController = navController,
+        startDestination = "converter"
+    ) {
+        composable("converter") { 
+            ConverterScreen(
+                onNavigateToHistory = { navController.navigate("history") },
+                onNavigateToSettings = { navController.navigate("settings") }
+            )
+        }
+        composable("history") { 
+            HistoryScreen(onBack = { navController.popBackStack() })
+        }
+        composable("settings") { 
+            SettingsScreen(onBack = { navController.popBackStack() })
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ConverterScreen(
+    onNavigateToHistory: () -> Unit,
+    onNavigateToSettings: () -> Unit
+) {
+    var amount by remember { mutableStateOf("") }
+    var fromCurrency by remember { mutableStateOf("USD") }
+    var toCurrency by remember { mutableStateOf("EUR") }
+    var result by remember { mutableStateOf("") }
+
+    val currencies = listOf("USD", "EUR", "GBP", "JPY", "RUB")
+    val exchangeRates = mapOf(
+        "USD" to 1.0,
+        "EUR" to 0.93,
+        "GBP" to 0.80,
+        "JPY" to 148.50,
+        "RUB" to 91.50
+    )
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Конвертер валют") },
+                actions = {
+                    IconButton(onClick = onNavigateToHistory) {
+                        Icon(Icons.Default.History, "История")
+                    }
+                    IconButton(onClick = onNavigateToSettings) {
+                        Icon(Icons.Default.Settings, "Настройки")
+                    }
+                }
+            )
+        }
+    ) { padding ->
+        Column(
+            modifier = Modifier
+                .padding(padding)
+                .fillMaxSize()
+                .padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            OutlinedTextField(
+                value = amount,
+                onValueChange = { amount = it },
+                label = { Text("Сумма") },
+                keyboardOptions = KeyboardOptions.Default.copy(
+                    keyboardType = KeyboardType.Number
+                ),
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("Из валюты:")
+                    ExposedDropdownMenuBox(
+                        expanded = false,
+                        onExpandedChange = {}
+                    ) {
+                        TextField(
+                            value = fromCurrency,
+                            onValueChange = {},
+                            readOnly = true,
+                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = false) }
+                        )
+                        ExposedDropdownMenu(
+                            expanded = false,
+                            onDismissRequest = {}
+                        ) {
+                            currencies.forEach { currency ->
+                                DropdownMenuItem(
+                                    text = { Text(currency) },
+                                    onClick = { fromCurrency = currency }
+                                )
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.width(16.dp))
+
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("В валюту:")
+                    ExposedDropdownMenuBox(
+                        expanded = false,
+                        onExpandedChange = {}
+                    ) {
+                        TextField(
+                            value = toCurrency,
+                            onValueChange = {},
+                            readOnly = true,
+                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = false) }
+                        )
+                        ExposedDropdownMenu(
+                            expanded = false,
+                            onDismissRequest = {}
+                        ) {
+                            currencies.forEach { currency ->
+                                DropdownMenuItem(
+                                    text = { Text(currency) },
+                                    onClick = { toCurrency = currency }
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            Button(
+                onClick = {
+                    if (amount.isNotEmpty()) {
+                        val amountValue = amount.toDouble()
+                        val rateFrom = exchangeRates[fromCurrency] ?: 1.0
+                        val rateTo = exchangeRates[toCurrency] ?: 1.0
+                        val converted = amountValue * (rateTo / rateFrom)
+                        result = "%.2f %s = %.2f %s".format(
+                            amountValue,
+                            fromCurrency,
+                            converted,
+                            toCurrency
+                        )
+                    }
+                },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("Конвертировать")
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            if (result.isNotEmpty()) {
+                Text(
+                    text = result,
+                    style = MaterialTheme.typography.headlineSmall
+                )
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun HistoryScreen(onBack: () -> Unit) {
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("История конвертаций") },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.Default.ArrowBack, "Назад")
+                    }
+                }
+            )
+        }
+    ) { padding ->
+        Column(
+            modifier = Modifier
+                .padding(padding)
+                .fillMaxSize()
+                .padding(16.dp)
+        ) {
+            Text("Список предыдущих конвертаций")
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun SettingsScreen(onBack: () -> Unit) {
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Настройки") },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.Default.ArrowBack, "Назад")
+                    }
+                }
+            )
+        }
+    ) { padding ->
+        Column(
+            modifier = Modifier
+                .padding(padding)
+                .fillMaxSize()
+                .padding(16.dp)
+        ) {
+            Text("Настройки приложения")
+        }
+    }
+}
+
+@Composable
+fun CurrencyConverterTheme(
+    content: @Composable () -> Unit
+) {
+    MaterialTheme(
+        content = content
+    )
+}
